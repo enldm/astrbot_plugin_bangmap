@@ -1,9 +1,11 @@
-# helloworld
+# 全国邦邦地图查询
 
-AstrBot 插件模板
+# 用法
 
-A template plugin for AstrBot plugin feature
+## 邦邦地图
 
-# 支持
+// 返回消息：欢迎使用全国邦邦地图查询，输入"邦邦地图 省份"来查询列表，可用二字简称。
 
-[帮助文档](https://astrbot.app)
+## 邦邦地图 $省份
+
+//从该 json 提取信息并返回
