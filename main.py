@@ -1,8 +1,9 @@
 # main.py
 from astrbot.api.all import *
 import aiohttp
+import time
 
-# 省份映射（内联，避免额外文件）
+# 省份映射
 PROVINCE_MAP = {
     "北京": "北京市", "天津": "天津市", "上海": "上海市", "重庆": "重庆市",
     "河北": "河北省", "山西": "山西省", "辽宁": "辽宁省", "吉林": "吉林省",
@@ -13,7 +14,7 @@ PROVINCE_MAP = {
     "甘肃": "甘肃省", "青海": "青海省", "台湾": "台湾省",
     "广西": "广西壮族自治区", "西藏": "西藏自治区", "宁夏": "宁夏回族自治区",
     "新疆": "新疆维吾尔自治区", "内蒙古": "内蒙古自治区",
-    "香港": "香港特别行政区", "澳门": "澳门特别行政区","海外": "海外"
+    "香港": "香港特别行政区", "澳门": "澳门特别行政区", "海外": "海外"
 }
 
 SINGLE_CHAR_ALIAS = {
@@ -30,40 +31,47 @@ SINGLE_CHAR_ALIAS = {
     "台": "台湾省",
 }
 
-_cache_data = None
-
-async def get_bang_data():
-    global _cache_data
-    if _cache_data is not None:
-        return _cache_data
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://enldm.cyou/banggroupinfo.json", timeout=10) as resp:
-                if resp.status == 200:
-                    _cache_data = await resp.json()
-                    return _cache_data
-    except:
-        pass
-    return {}
-
-def resolve_province(inp: str) -> str:
-    inp = inp.strip()
-    if not inp:
-        return ""
-    full_set = set(PROVINCE_MAP.values())
-    if inp in full_set:
-        return inp
-    if inp in PROVINCE_MAP:
-        return PROVINCE_MAP[inp]
-    if inp in SINGLE_CHAR_ALIAS:
-        return SINGLE_CHAR_ALIAS[inp]
-    return ""
-
 @register("bang_map", "enldm", "全国邦群查询", "v0.1", "https://github.com/enldm/astrbot_plugin_bangmap")
 class BangMapPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.config = self.context.get_config() or {}
+        self._cache_data = None
+        self._cache_time = 0  # Unix timestamp
+
+    async def _get_bang_data(self):
+        # 缓存有效期：3600 秒（1 小时）
+        if self._cache_data is not None and (time.time() - self._cache_time) < 3600:
+            return self._cache_data
+
+        url = "https://enldm.cyou/banggroupinfo.json"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        self._cache_data = data
+                        self._cache_time = time.time()
+                        return data
+                    else:
+                        logger.error(f"邦邦地图：HTTP 请求失败，状态码 {resp.status}")
+                        return None
+        except Exception as e:
+            logger.error(f"邦邦地图：获取数据失败 - {e}")
+            return None
+
+    def _resolve_province(self, inp: str) -> str:
+        inp = inp.strip()
+        if not inp:
+            return ""
+        full_set = set(PROVINCE_MAP.values())
+        if inp in full_set:
+            return inp
+        if inp in PROVINCE_MAP:
+            return PROVINCE_MAP[inp]
+        if inp in SINGLE_CHAR_ALIAS:
+            return SINGLE_CHAR_ALIAS[inp]
+        return ""
 
     @command("邦邦地图")
     async def bang_map_command(self, event: AstrMessageEvent, province: str = ""):
@@ -81,12 +89,12 @@ class BangMapPlugin(Star):
             )
             return
 
-        province_full = resolve_province(province)
+        province_full = self._resolve_province(province)
         if not province_full:
             yield event.plain_result(f"❌ 未识别省份「{province}」。请使用标准名称或简称（如：粤、江苏、北京）。")
             return
 
-        data = await get_bang_data()
+        data = await self._get_bang_data()
         if not data:
             yield event.plain_result("❌ 邦邦群数据加载失败，请稍后再试。")
             return
@@ -99,9 +107,5 @@ class BangMapPlugin(Star):
         for item in data[province_full]:
             clean = " ".join(item.split())
             lines.append(f"• {clean}")
-        
-        text = "\n".join(lines)
-        if len(text) > 2000:
-            text = text[:1990] + "\n...（内容过长已截断）"
         
         yield event.plain_result(text)
