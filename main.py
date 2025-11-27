@@ -85,8 +85,7 @@ class BangMapPlugin(Star):
             yield event.plain_result(
                 "欢迎使用全国邦邦地图查询！\n"
                 "请输入：邦邦地图 省份\n"
-                "支持省份全称或二字简称（例如：广东、粤、海外）。\n"
-                "投稿反馈请访问 https://enldm.cyou/bangmap "
+                "支持省份全称或二字简称（例如：广东、粤、海外）。"
             )
             return
 
@@ -108,9 +107,5 @@ class BangMapPlugin(Star):
         for item in data[province_full]:
             clean = " ".join(item.split())
             lines.append(f"• {clean}")
-        
-        text = "\n".join(lines)
-        if len(text) > 2000:
-            text = text[:1990] + "\n...（内容过长已截断）"
         
         yield event.plain_result(text)
