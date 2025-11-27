@@ -108,4 +108,8 @@ class BangMapPlugin(Star):
             clean = " ".join(item.split())
             lines.append(f"• {clean}")
         
+        text = "\n".join(lines)
+        if len(text) > 2000:
+            text = text[:1990] + "\n...（内容过长已截断）"
+        
         yield event.plain_result(text)
