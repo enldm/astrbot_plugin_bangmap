@@ -44,15 +44,29 @@ class BangMapPlugin(Star):
         if self._cache_data is not None and (time.time() - self._cache_time) < 3600:
             return self._cache_data
 
-        url = "https://enldm.cyou/banggroupinfo.json"
+        url = "https://mapapi.enldm.cyou/api/bandori"
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=10) as resp:
                     if resp.status == 200:
-                        data = await resp.json()
-                        self._cache_data = data
-                        self._cache_time = time.time()
-                        return data
+                        response = await resp.json()
+                        # 转换新格式为旧格式，保持兼容性
+                        if response.get("success") and "data" in response:
+                            # 按省份分组
+                            province_data = {}
+                            for item in response["data"]:
+                                province = item.get("province", "")
+                                raw_text = item.get("raw_text", "")
+                                if province and raw_text:
+                                    if province not in province_data:
+                                        province_data[province] = []
+                                    province_data[province].append(raw_text)
+                            self._cache_data = province_data
+                            self._cache_time = time.time()
+                            return province_data
+                        else:
+                            logger.error(f"邦邦地图：API 返回数据格式错误")
+                            return None
                     else:
                         logger.error(f"邦邦地图：HTTP 请求失败，状态码 {resp.status}")
                         return None
