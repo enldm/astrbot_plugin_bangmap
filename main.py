@@ -31,7 +31,7 @@ SINGLE_CHAR_ALIAS = {
     "台": "台湾省",
 }
 
-@register("bang_map", "enldm", "全国邦群查询", "v0.1", "https://github.com/enldm/astrbot_plugin_bangmap")
+@register("bang_map", "enldm", "全国邦群查询", "v0.3", "https://github.com/enldm/astrbot_plugin_bangmap")
 class BangMapPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -113,12 +113,23 @@ class BangMapPlugin(Star):
             yield event.plain_result("❌ 邦邦群数据加载失败，请稍后再试。")
             return
 
+        # 尝试匹配：先用完整名称，如果找不到则去掉后缀再试
+        matched_province = province_full
         if province_full not in data or not data[province_full]:
+            # 去掉后缀再试（"四川省" -> "四川"）
+            for suffix in ["省", "市", "自治区", "壮族自治区", "回族自治区", "维吾尔自治区", "特别行政区"]:
+                if province_full.endswith(suffix):
+                    short_province = province_full[:-len(suffix)]
+                    if short_province in data and data[short_province]:
+                        matched_province = short_province
+                        break
+
+        if matched_province not in data or not data[matched_province]:
             yield event.plain_result(f"⚠️ 「{province_full}」暂无登记的邦邦群信息。")
             return
 
-        lines = [f"📍{province_full} 的邦邦群如下："]
-        for item in data[province_full]:
+        lines = [f"📍{matched_province} 的邦邦群如下："]
+        for item in data[matched_province]:
             clean = " ".join(item.split())
             lines.append(f"• {clean}")
         
